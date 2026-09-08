@@ -22,5 +22,3 @@ npm install
 export OPENROUTER_API_KEY="your-key-here"
 npm run dev
 ```
-
-Open the local URL printed in your terminal. Usage is billed to your OpenRouter account.
