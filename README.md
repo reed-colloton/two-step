@@ -1,6 +1,13 @@
 # Two Step
 
-A chat app that works in two steps: **Fable 5.1** rewrites your prompt to make it clearer, then **GPT-6 Astra** answers it. You can read the rewritten prompt with the answer.
+Two Step is an AI chat app that improves your prompt before answering it. The idea is to get more useful answers without having to figure out how to write a good prompt yourself.
+
+Ask a question or describe what you need in your own words. The app then:
+
+1. Uses **Fable 5.1** to turn your message into a clearer request, keeping your intent and relevant conversation context.
+2. Sends that request to **GPT-6 Astra** to produce the answer.
+
+You can inspect the rewritten prompt to see what changed and keep chatting to follow up.
 
 ![Two Step](docs/screenshot.jpg)
 
