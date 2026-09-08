@@ -63,8 +63,8 @@ void test('older settings keep defaults and saved model choices survive a round 
 });
 
 void test('model names reflect each selection and preserve readable provider names', () => {
-  assert.equal(modelName(DEFAULT_MODELS.improver, FALLBACK_MODELS), 'Opus 5');
-  assert.equal(modelName(DEFAULT_MODELS.answerer, FALLBACK_MODELS), 'Sonnet 5');
+  assert.equal(modelName(DEFAULT_MODELS.improver, FALLBACK_MODELS), 'Fable 5.1');
+  assert.equal(modelName(DEFAULT_MODELS.answerer, FALLBACK_MODELS), 'GPT-6 Astra');
   assert.equal(modelName('openai/gpt-5.6-sol', FALLBACK_MODELS), 'GPT-5.6 Sol');
   assert.equal(
     modelName('example/choice', [
@@ -106,10 +106,10 @@ void test('the catalog excludes batch, non-text, and models missing tools or rea
       },
       {
         ...model,
-        id: 'anthropic/claude-sonnet-5',
-        name: 'Anthropic: Claude Sonnet 5',
+        id: 'openai/gpt-6-astra',
+        name: 'OpenAI: GPT-6 Astra',
       },
-      { ...model, id: 'anthropic/claude-opus-5', name: 'Claude Opus 5' },
+      { ...model, id: 'anthropic/claude-fable-5.1', name: 'Claude Fable 5.1' },
       null,
       {},
       model,
@@ -117,7 +117,7 @@ void test('the catalog excludes batch, non-text, and models missing tools or rea
   });
   assert.deepEqual(
     options.map(({ id }) => id),
-    ['anthropic/claude-opus-5', 'anthropic/claude-sonnet-5', 'example/chat'],
+    ['anthropic/claude-fable-5.1', 'openai/gpt-6-astra', 'example/chat'],
   );
   assert.deepEqual(Object.keys(options[0]).sort(), ['id', 'name']);
   assert.throws(() => parseModelCatalog({ data: [] }));

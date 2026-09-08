@@ -68,8 +68,8 @@ void test('the answerer receives only its own instructions, clean history, and r
     mockFetch,
   );
   assert.equal(requests.length, 2);
-  assert.equal(requests[0].model, 'anthropic/claude-opus-5');
-  assert.equal(requests[1].model, 'anthropic/claude-sonnet-5');
+  assert.equal(requests[0].model, 'anthropic/claude-fable-5.1');
+  assert.equal(requests[1].model, 'openai/gpt-6-astra');
   assert.deepEqual(requests[0].reasoning, { effort: 'low', exclude: true });
   assert.deepEqual(requests[1].reasoning, { effort: 'high', exclude: true });
   const answer = JSON.stringify(requests[1]);
