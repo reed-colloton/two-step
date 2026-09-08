@@ -198,10 +198,6 @@ summary:focus-visible {
   flex: 1;
   text-align: left;
 }
-.history-link svg {
-  flex-shrink: 0;
-  color: #7d8797;
-}
 .history-link span {
   white-space: nowrap;
   overflow: hidden;
@@ -265,31 +261,29 @@ summary:focus-visible {
   display: flex;
   gap: 11px;
   align-items: center;
+  flex-shrink: 0;
 }
 .header-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
   font-size: 15px;
   font-weight: 550;
 }
-.beta-badge {
-  font-size: 10px;
-  letter-spacing: 0.07em;
-  padding: 3px 5px;
-  border-radius: 4px;
-  background: #f3f5f8;
-  color: #8991a0;
-}
-.model-flow {
-  display: flex;
+.header-settings {
+  display: inline-flex;
   align-items: center;
-  gap: 9px;
-  font-size: 12px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 8px;
   color: #7b8493;
 }
-.model-flow:hover {
+.header-settings:hover {
   color: var(--primary);
-}
-.model-flow > svg:last-child {
-  margin-left: 5px;
+  background: #f2f5fe;
 }
 .chat-scroll {
   flex: 1;
@@ -305,7 +299,7 @@ summary:focus-visible {
   text-align: center;
 }
 .welcome h1 {
-  margin: 22px 0 10px;
+  margin: 0 0 10px;
   font-size: clamp(30px, 3vw, 38px);
   font-weight: 550;
   letter-spacing: -1.4px;
@@ -389,66 +383,6 @@ summary:focus-visible {
 }
 .send-button.stop {
   background: #2b3344;
-}
-.composer-note {
-  font-size: 12px;
-  color: #9aa1ad;
-  text-align: center;
-  margin: 12px 0 0;
-}
-.suggestions {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 28px;
-}
-.suggestions button {
-  border: 1px solid #edf0f4;
-  border-radius: 10px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 15px 13px;
-  color: #647082;
-  text-align: left;
-  font-size: 12px;
-  transition:
-    background 0.15s,
-    border-color 0.15s;
-}
-.suggestions button > svg:first-child {
-  color: #7c8aa5;
-}
-.suggestions button > svg:last-child {
-  margin-left: auto;
-  color: #a8b1c0;
-}
-.suggestions button:hover {
-  background: #f8faff;
-  border-color: #dbe3f5;
-}
-.how-it-works {
-  display: inline-flex;
-  align-items: center;
-  gap: 18px;
-  margin-top: 49px;
-  color: #9aa3b3;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-}
-.how-it-works b {
-  color: #8791a1;
-  font-weight: 450;
-  letter-spacing: 0;
-  margin-left: 5px;
-  font-size: 12px;
-}
-.step-line {
-  display: inline-block;
-  height: 1px;
-  width: 32px;
-  background: #dbe1ea;
 }
 .messages {
   max-width: 760px;
@@ -737,15 +671,6 @@ summary:focus-visible {
   padding: 20px 18px;
   gap: 10px;
 }
-.sheet-eyebrow {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: #8692a6;
-  margin-bottom: 14px;
-}
 .sheet-title {
   font-size: 23px;
   letter-spacing: -0.7px;
@@ -760,6 +685,7 @@ summary:focus-visible {
   padding: 0 16px;
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 .prompt-tab-list[data-slot='tabs-list'] {
   width: 100%;
@@ -775,18 +701,50 @@ summary:focus-visible {
 .prompt-panel[hidden] {
   display: none;
 }
-.prompt-model {
+.model-label-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
-  font-size: 13px;
-  color: #55637a;
-  padding: 8px 0 22px;
+  margin: 4px 0 8px;
 }
-.prompt-model > span:last-child {
+.model-label-row .prompt-label {
+  margin: 0;
+}
+.model-label-row > span {
   color: #8c97a9;
   font-size: 12px;
-  margin-left: auto;
+}
+.model-picker[data-slot='input-group'] {
+  width: 100%;
+  min-height: 40px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+  background: #fafbfe;
+}
+.model-options {
+  max-width: calc(100vw - 32px);
+}
+.model-option {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px 0;
+}
+.model-option > span {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.model-option > small,
+.model-catalog-note {
+  color: #828c9d;
+  font-size: 12px;
+}
+.model-catalog-note button {
+  color: var(--primary);
+  text-decoration: underline;
 }
 .prompt-label {
   font-size: 12px;
@@ -841,16 +799,6 @@ summary:focus-visible {
   opacity: 0.5;
 }
 @media (max-width: 900px) {
-  .suggestions {
-    gap: 7px;
-  }
-  .suggestions button {
-    font-size: 12px;
-    padding: 12px 9px;
-  }
-  .suggestions button > svg:last-child {
-    display: none;
-  }
   .chat-header {
     padding: 18px 20px;
   }
@@ -867,16 +815,6 @@ summary:focus-visible {
   .header-title {
     font-size: 14px;
   }
-  .beta-badge {
-    display: none;
-  }
-  .model-flow {
-    font-size: 11px;
-    gap: 4px;
-  }
-  .model-flow > svg:last-child {
-    display: none;
-  }
   .welcome {
     width: calc(100% - 32px);
     padding-top: 8vh;
@@ -886,22 +824,6 @@ summary:focus-visible {
   }
   .welcome > p {
     font-size: 14px;
-  }
-  .suggestions {
-    display: flex;
-    flex-direction: column;
-    margin-top: 23px;
-  }
-  .suggestions button {
-    font-size: 13px;
-    padding: 12px 15px;
-    gap: 12px;
-  }
-  .suggestions button > svg:last-child {
-    display: block;
-  }
-  .how-it-works {
-    margin-top: 27px;
   }
   .messages {
     padding: 20px 18px;
@@ -933,8 +855,6 @@ summary:focus-visible {
 }
 
 .search-control,
-.suggestions button,
-.prompt-model,
 .prompt-label,
 .sheet-actions button {
   font-size: 14px;

@@ -1,8 +1,5 @@
-import {
-  DEFAULT_PROMPTS,
-  MODELS,
-  type PromptSettings,
-} from '../lib/prompts.ts';
+import { DEFAULT_PROMPTS, type PromptSettings } from '../lib/prompts.ts';
+import { parseModelSettings, type ModelSettings } from '../lib/models.ts';
 import type { ChatEvent, Citation, HistoryMessage } from '../lib/chat-types.ts';
 import { readSSE } from '../lib/sse.ts';
 
@@ -12,6 +9,7 @@ export type ChatInput = {
   history: HistoryMessage[];
   webSearch: boolean;
   prompts: PromptSettings;
+  models: ModelSettings;
 };
 export class ChatError extends Error {
   status: number;
@@ -64,6 +62,12 @@ export function parseInput(value: unknown): ChatInput {
   }
   while (recent[0]?.role === 'assistant') recent.shift();
   const prompts = { ...DEFAULT_PROMPTS };
+  let models: ModelSettings;
+  try {
+    models = parseModelSettings(body.models);
+  } catch {
+    throw new ChatError('Choose a valid model for each step in settings.', 400);
+  }
   if (body.prompts !== undefined) {
     if (
       !body.prompts ||
@@ -89,6 +93,7 @@ export function parseInput(value: unknown): ChatInput {
     history: recent,
     webSearch: body.webSearch !== false,
     prompts,
+    models,
   };
 }
 
@@ -114,7 +119,7 @@ export function buildRequests(
   const improving = improvedPrompt === null;
   const system = improving ? input.prompts.improver : input.prompts.answerer;
   return {
-    model: improving ? MODELS.improver.id : MODELS.answerer.id,
+    model: improving ? input.models.improver : input.models.answerer,
     messages: [
       {
         role: 'system',
@@ -125,7 +130,7 @@ export function buildRequests(
     ],
     stream: !improving,
     ...(improving ? {} : { stream_options: { include_usage: true } }),
-    reasoning: { effort: improving ? 'low' : 'medium', exclude: true },
+    reasoning: { effort: improving ? 'low' : 'high', exclude: true },
     max_tokens: improving ? 4096 : 12288,
     ...(input.webSearch
       ? {

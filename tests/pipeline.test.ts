@@ -69,7 +69,9 @@ void test('the answerer receives only its own instructions, clean history, and r
   );
   assert.equal(requests.length, 2);
   assert.equal(requests[0].model, 'anthropic/claude-opus-5');
-  assert.equal(requests[1].model, 'openai/gpt-5.6-sol');
+  assert.equal(requests[1].model, 'anthropic/claude-sonnet-5');
+  assert.deepEqual(requests[0].reasoning, { effort: 'low', exclude: true });
+  assert.deepEqual(requests[1].reasoning, { effort: 'high', exclude: true });
   const answer = JSON.stringify(requests[1]);
   for (const secret of [
     'IMPROVER PRIVATE SYSTEM',
@@ -93,6 +95,45 @@ void test('disabling web search removes tools from both model requests', () => {
     const body = buildRequests(input, prompt);
     assert.equal('tools' in body, false);
     assert.equal('max_tool_calls' in body, false);
+  }
+});
+
+void test('each selected model reaches its step with the existing reasoning and search limits', () => {
+  const input = parseInput({
+    message: 'A user request',
+    models: {
+      improver: 'anthropic/claude-sonnet-5',
+      answerer: 'openai/gpt-5.6-sol',
+      reasoning: 'DO NOT FORWARD',
+    },
+  });
+  const first = buildRequests(input, null);
+  const second = buildRequests(input, 'The improved request');
+  assert.equal(first.model, 'anthropic/claude-sonnet-5');
+  assert.equal(second.model, 'openai/gpt-5.6-sol');
+  assert.equal(first.reasoning.effort, 'low');
+  assert.equal(second.reasoning.effort, 'high');
+  assert.equal(first.max_tool_calls, 1);
+  assert.equal(second.max_tool_calls, 6);
+  assert.equal(second.messages.at(-1)?.content, 'The improved request');
+  assert.equal(JSON.stringify(second).includes('DO NOT FORWARD'), false);
+});
+
+void test('invalid model selections are rejected before any provider call', () => {
+  for (const models of [
+    null,
+    [],
+    'openai/gpt-5.6-sol',
+    { answerer: '' },
+    { answerer: 'https://example.com/model' },
+    { improver: { id: 'anthropic/claude-sonnet-5' } },
+    { answerer: 'openai/model\nextra instructions' },
+    { answerer: `openai/${'x'.repeat(201)}` },
+  ]) {
+    assert.throws(
+      () => parseInput({ message: 'Hi', models }),
+      (error: unknown) => error instanceof ChatError && error.status === 400,
+    );
   }
 });
 

@@ -25,7 +25,7 @@ Match the user's language, tone, and requested level of detail. Lead with the an
 
 export const MODELS = {
   improver: { id: 'anthropic/claude-opus-5', name: 'Claude Opus 5' },
-  answerer: { id: 'openai/gpt-5.6-sol', name: 'GPT-5.6 Sol' },
+  answerer: { id: 'anthropic/claude-sonnet-5', name: 'Claude Sonnet 5' },
 } as const;
 
 export type PromptSettings = { improver: string; answerer: string };

@@ -42,7 +42,18 @@ type SidebarContextProps = {
   toggleSidebar: () => void;
 };
 
-const SidebarContext = React.createContext<SidebarContextProps | null>(null);
+// Fast Refresh can briefly mix an old provider with a newly evaluated hook.
+// Keep their context identity stable across module updates; the value remains
+// owned by each provider, so separate renders never share sidebar state.
+const sidebarHotData = import.meta.env.SSR ? undefined : import.meta.hot?.data;
+const SidebarContext =
+  (sidebarHotData?.sidebarContext as
+    | React.Context<SidebarContextProps | null>
+    | undefined) ?? React.createContext<SidebarContextProps | null>(null);
+
+if (sidebarHotData) {
+  sidebarHotData.sidebarContext = SidebarContext;
+}
 
 function useSidebar() {
   const context = React.useContext(SidebarContext);

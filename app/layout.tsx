@@ -13,9 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Two Step — Ask it your way',
-  description:
-    'A thoughtful chat assistant that brings clarity to your request before answering. Powered by Claude Opus 5 and GPT-5.6 Sol.',
+  title: 'Two Step',
+  description: 'A chatbot that improves your prompt before answering.',
 };
 
 export default function RootLayout({

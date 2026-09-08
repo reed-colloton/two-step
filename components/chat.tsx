@@ -9,13 +9,9 @@ import {
   ChevronsRight,
   Copy,
   Globe2,
-  Lightbulb,
-  MessageSquare,
-  PenLine,
   Plus,
   RotateCcw,
   SlidersHorizontal,
-  Sparkles,
   Square,
   Trash2,
 } from 'lucide-react';
@@ -39,7 +35,17 @@ import {
 } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { DEFAULT_PROMPTS, MODELS, type PromptSettings } from '@/lib/prompts';
+import { DEFAULT_PROMPTS, type PromptSettings } from '@/lib/prompts';
+import {
+  DEFAULT_MODELS,
+  FALLBACK_MODELS,
+  modelLabels,
+  parseCachedModels,
+  parseModelSettings,
+  type ModelOption,
+  type ModelSettings,
+} from '@/lib/models';
+import { ModelPicker } from '@/components/model-picker';
 import { readSSE } from '@/lib/sse';
 import type { ChatEvent, Citation } from '@/lib/chat-types';
 
@@ -58,6 +64,8 @@ type Conversation = { id: string; title: string; messages: Message[] };
 type Stage = 'idle' | 'improving' | 'answering';
 const STORAGE_KEY = 'two-step.chats.v1';
 const SETTINGS_KEY = 'two-step.prompts.v1';
+const MODELS_KEY = 'two-step.models.v1';
+const MODEL_NAMES_KEY = 'two-step.model-names.v1';
 const EMPTY_MESSAGES: Message[] = [];
 const uid = () => crypto.randomUUID();
 const makeChat = (): Conversation => ({
@@ -70,6 +78,17 @@ function Mark({ small = false }: { small?: boolean }) {
   return (
     <span className={`brand-mark ${small ? 'small' : ''}`} aria-hidden="true">
       <ChevronsRight />
+    </span>
+  );
+}
+
+function HeaderBrand() {
+  const { isMobile, open, openMobile } = useSidebar();
+  if (isMobile ? openMobile : open) return null;
+  return (
+    <span className="header-title">
+      <Mark small />
+      Two Step
     </span>
   );
 }
@@ -106,15 +125,10 @@ function Navigation({
         <button className="new-chat" onClick={() => close(create)}>
           <Plus size={18} />
           New chat
-          <PenLine size={16} className="ml-auto" />
         </button>
-        <div className="nav-label">Your chats</div>
+        <div className="nav-label">Chats</div>
         {chats.filter((c) => c.messages.length > 0).length === 0 && (
-          <p className="nav-empty">
-            Good conversations start
-            <br />
-            with a first thought.
-          </p>
+          <p className="nav-empty">No chats yet.</p>
         )}
         {chats
           .filter((c) => c.messages.length > 0)
@@ -127,7 +141,6 @@ function Navigation({
                 className="history-link"
                 onClick={() => close(() => select(c.id))}
               >
-                <MessageSquare size={16} />
                 <span>{c.title}</span>
               </button>
               <button
@@ -143,7 +156,7 @@ function Navigation({
       <SidebarFooter className="nav-footer">
         <button className="settings-button" onClick={() => close(settings)}>
           <SlidersHorizontal size={17} />
-          System prompts
+          Settings
           <ChevronRight size={16} className="ml-auto" />
         </button>
         <div className="local-note">
@@ -164,6 +177,14 @@ export function Chat() {
   const [search, setSearch] = useState(true);
   const [prompts, setPrompts] = useState<PromptSettings>(DEFAULT_PROMPTS);
   const [drafts, setDrafts] = useState<PromptSettings>(DEFAULT_PROMPTS);
+  const [models, setModels] = useState<ModelSettings>(DEFAULT_MODELS);
+  const [modelDrafts, setModelDrafts] = useState<ModelSettings>(DEFAULT_MODELS);
+  const [modelOptions, setModelOptions] =
+    useState<ModelOption[]>(FALLBACK_MODELS);
+  const [catalogStatus, setCatalogStatus] = useState<
+    'loading' | 'ready' | 'error'
+  >('loading');
+  const [catalogAttempt, setCatalogAttempt] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [configured, setConfigured] = useState<boolean | null>(null);
@@ -176,6 +197,7 @@ export function Chat() {
   const active = chats.find((c) => c.id === activeId);
   const messages = active?.messages ?? EMPTY_MESSAGES;
   const busy = stage !== 'idle';
+  const labels = modelLabels(models, modelOptions, ready);
 
   useEffect(() => {
     // One browser-storage hydration after SSR; server rendering cannot read it.
@@ -206,6 +228,26 @@ export function Chat() {
         // eslint-disable-next-line react/react-compiler -- One-time hydration of browser storage after SSR.
         setPrompts(settings);
       }
+      const savedModels = localStorage.getItem(MODELS_KEY);
+      if (savedModels) {
+        try {
+          // eslint-disable-next-line react/react-compiler -- One-time hydration of saved model choices after SSR.
+          setModels(parseModelSettings(JSON.parse(savedModels)));
+        } catch {
+          // Invalid saved model choices use defaults without discarding chats or prompts.
+        }
+      }
+      try {
+        const cached = parseCachedModels(
+          JSON.parse(localStorage.getItem(MODEL_NAMES_KEY) ?? 'null'),
+        );
+        if (cached.length) {
+          // eslint-disable-next-line react/react-compiler -- Restore cached model names with the saved IDs before revealing labels.
+          setModelOptions(cached);
+        }
+      } catch {
+        // Names stay hidden until the catalog resolves any uncached selections.
+      }
     } catch {
       setNotice(
         'Browser storage is unavailable. This chat will still work for this session.',
@@ -223,6 +265,29 @@ export function Chat() {
       .catch(() => setConfigured(null));
     return () => abortRef.current?.abort();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/models', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Model list unavailable');
+        const data = (await response.json()) as { models: ModelOption[] };
+        if (!Array.isArray(data.models) || !data.models.length)
+          throw new Error('Model list unavailable');
+        if (controller.signal.aborted) return;
+        setModelOptions(data.models);
+        setCatalogStatus('ready');
+        try {
+          localStorage.setItem(MODEL_NAMES_KEY, JSON.stringify(data.models));
+        } catch {
+          // Caching names is optional when browser storage is unavailable.
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setCatalogStatus('error');
+      });
+    return () => controller.abort();
+  }, [catalogAttempt]);
 
   useEffect(() => {
     if (!ready || busy) return;
@@ -356,6 +421,7 @@ export function Chat() {
             .map(({ role, content: text }) => ({ role, content: text })),
           webSearch: search,
           prompts,
+          models,
         }),
       });
       if (!response.ok) {
@@ -415,6 +481,7 @@ export function Chat() {
 
   function openSettings() {
     setDrafts(prompts);
+    setModelDrafts(models);
     setSettingsOpen(true);
   }
   function saveSettings() {
@@ -424,11 +491,14 @@ export function Chat() {
     };
     if (!next.improver || !next.answerer) return;
     setPrompts(next);
+    setModels({ ...modelDrafts });
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+      localStorage.setItem(MODELS_KEY, JSON.stringify(modelDrafts));
+      localStorage.setItem(MODEL_NAMES_KEY, JSON.stringify(modelOptions));
     } catch {
       setNotice(
-        'Prompt changes apply for this session; browser storage is unavailable.',
+        'Settings apply for this session; browser storage is unavailable.',
       );
     }
     setSettingsOpen(false);
@@ -470,7 +540,7 @@ export function Chat() {
         <textarea
           ref={textarea}
           aria-label="Message Two Step"
-          placeholder="Ask anything, however it comes to mind…"
+          placeholder="Ask about something complicated..."
           rows={2}
           maxLength={20000}
           value={input}
@@ -488,8 +558,7 @@ export function Chat() {
         />
         <div className="composer-toolbar">
           <div className="search-control">
-            <Globe2 size={16} />
-            <label htmlFor="web-search">Web search</label>
+            <label htmlFor="web-search">Search</label>
             <Switch
               id="web-search"
               size="sm"
@@ -519,11 +588,6 @@ export function Chat() {
           )}
         </div>
       </form>
-      <p className="composer-note">
-        {busy
-          ? 'Working on your request. You can stop at any time.'
-          : 'Your words. A clearer request. A more useful answer.'}
-      </p>
     </div>
   );
 
@@ -541,18 +605,16 @@ export function Chat() {
         <header className="chat-header">
           <div className="header-left">
             <SidebarTrigger aria-label="Toggle sidebar" />
-            <span className="header-title">Two Step</span>
-            <span className="beta-badge">BETA</span>
+            <HeaderBrand />
           </div>
           <button
-            className="model-flow"
+            className="header-settings"
             onClick={openSettings}
-            aria-label="Review system prompts and models"
+            aria-label="Settings"
+            title="Settings"
+            disabled={!ready}
           >
-            <span>Opus 5</span>
-            <ChevronRight size={13} />
-            <span>GPT-5.6 Sol</span>
-            <SlidersHorizontal size={14} />
+            <SlidersHorizontal size={18} />
           </button>
         </header>
         <div
@@ -566,53 +628,13 @@ export function Chat() {
         >
           {!messages.length ? (
             <div className="welcome">
-              <Mark />
-              <h1>Ask it your way.</h1>
-              <p>Bring the question. We’ll bring a little clarity.</p>
+              <h1>Two Step</h1>
+              <p aria-hidden={!labels}>
+                {labels
+                  ? `${labels.improver} improves your prompt. ${labels.answerer} answers it.`
+                  : '\u00a0'}
+              </p>
               {composer}
-              <div className="suggestions">
-                {[
-                  {
-                    icon: PenLine,
-                    label: 'Find the right words',
-                    prompt:
-                      'Help me write an email that sounds clear and friendly.',
-                  },
-                  {
-                    icon: Lightbulb,
-                    label: 'Make sense of something',
-                    prompt:
-                      'Explain something complicated to me in simple terms.',
-                  },
-                  {
-                    icon: Sparkles,
-                    label: 'Think it through',
-                    prompt: 'Help me think through a decision I need to make.',
-                  },
-                ].map(({ icon: Icon, label, prompt }) => (
-                  <button
-                    key={label}
-                    onClick={() => {
-                      setInput(prompt);
-                      textarea.current?.focus();
-                    }}
-                  >
-                    <Icon size={17} />
-                    <span>{label}</span>
-                    <ArrowUpRight size={14} />
-                  </button>
-                ))}
-              </div>
-              <button className="how-it-works" onClick={openSettings}>
-                <span>
-                  01 <b>Clarify</b>
-                </span>
-                <span className="step-line" />
-                <span>
-                  02 <b>Answer</b>
-                </span>
-                <ChevronRight size={14} />
-              </button>
             </div>
           ) : (
             <div className="messages">
@@ -638,12 +660,12 @@ export function Chat() {
                       <details className="improvement">
                         <summary>
                           <Check size={14} />
-                          <span>Request clarified</span>
+                          <span>Rewritten prompt</span>
                           <ChevronRight size={14} />
                         </summary>
                         <div className="improvement-content">
                           <div className="improvement-heading">
-                            The request used for this answer
+                            Sent to the answering model
                             <button
                               onClick={() =>
                                 void copy(
@@ -651,7 +673,7 @@ export function Chat() {
                                   `prompt-${message.id}`,
                                 )
                               }
-                              aria-label="Copy improved request"
+                              aria-label="Copy rewritten prompt"
                             >
                               {copied === `prompt-${message.id}` ? (
                                 <Check size={14} />
@@ -688,10 +710,8 @@ export function Chat() {
                       <output className="thinking">
                         <span className="thinking-dot" />
                         {stage === 'improving'
-                          ? 'Bringing clarity to your request…'
-                          : message.content
-                            ? 'Writing…'
-                            : 'Thinking through your answer…'}
+                          ? 'Rewriting prompt…'
+                          : 'Answering…'}
                       </output>
                     )}
                     {message.citations && message.citations.length > 0 && (
@@ -775,34 +795,56 @@ export function Chat() {
       <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
         <SheetContent className="prompt-sheet">
           <SheetHeader>
-            <div className="sheet-eyebrow">
-              <SlidersHorizontal size={16} />
-              BEHIND THE ANSWER
-            </div>
-            <SheetTitle className="sheet-title">
-              Two agents. Two prompts.
-            </SheetTitle>
+            <SheetTitle className="sheet-title">Settings</SheetTitle>
             <SheetDescription>
-              Review and tune the instructions. Changes apply to your next
-              message and stay in this browser.
+              Edits apply to the next message. Saved in this browser.
             </SheetDescription>
+            {catalogStatus !== 'ready' && (
+              <output className="model-catalog-note">
+                {catalogStatus === 'loading' ? (
+                  'Loading models…'
+                ) : (
+                  <>
+                    Couldn’t load more models.{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCatalogStatus('loading');
+                        setCatalogAttempt((attempt) => attempt + 1);
+                      }}
+                    >
+                      Retry
+                    </button>
+                  </>
+                )}
+              </output>
+            )}
           </SheetHeader>
           <Tabs defaultValue="improver" className="prompt-tabs">
             <TabsList className="prompt-tab-list">
-              <TabsTrigger value="improver">01 · Improve</TabsTrigger>
+              <TabsTrigger value="improver">01 · Rewrite</TabsTrigger>
               <TabsTrigger value="answerer">02 · Answer</TabsTrigger>
             </TabsList>
             {(['improver', 'answerer'] as const).map((key) => (
               <TabsContent value={key} key={key} className="prompt-panel">
-                <div className="prompt-model">
-                  <span className="status-dot" />
-                  {MODELS[key].name}
+                <div className="model-label-row">
+                  <label htmlFor={`model-${key}`} className="prompt-label">
+                    Model
+                  </label>
                   <span>
                     {key === 'improver'
-                      ? 'Up to 1 search'
-                      : 'Up to 6 tool steps'}
+                      ? 'Low reasoning · 1 search max'
+                      : 'High reasoning · 6 searches max'}
                   </span>
                 </div>
+                <ModelPicker
+                  id={`model-${key}`}
+                  value={modelDrafts[key]}
+                  options={modelOptions}
+                  onChange={(id) =>
+                    setModelDrafts((prev) => ({ ...prev, [key]: id }))
+                  }
+                />
                 <label htmlFor={`prompt-${key}`} className="prompt-label">
                   System prompt
                 </label>
@@ -817,23 +859,28 @@ export function Chat() {
                 />
                 <p className="prompt-hint">
                   {key === 'improver'
-                    ? 'Clarifies the latest request. Its reasoning and tool trace stay within this step.'
-                    : 'Receives its own system prompt, normal chat history, and the clarified request. It has no information about the improvement process.'}
+                    ? 'Rewrites your request before it reaches the answering model.'
+                    : 'Receives the rewritten prompt and chat history, without the first agent’s reasoning.'}
                 </p>
               </TabsContent>
             ))}
           </Tabs>
           <div className="sheet-actions">
-            <button onClick={() => setDrafts(DEFAULT_PROMPTS)}>
+            <button
+              onClick={() => {
+                setDrafts(DEFAULT_PROMPTS);
+                setModelDrafts(DEFAULT_MODELS);
+              }}
+            >
               <RotateCcw size={15} />
-              Reset both
+              Reset defaults
             </button>
             <button
               className="save-prompts"
               onClick={saveSettings}
               disabled={!drafts.improver.trim() || !drafts.answerer.trim()}
             >
-              Save prompts
+              Save settings
               <Check size={16} />
             </button>
           </div>
