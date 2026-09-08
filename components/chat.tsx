@@ -574,7 +574,7 @@ export function Chat() {
               onClick={stop}
               aria-label="Stop response"
             >
-              <Square size={15} fill="currentColor" />
+              <Square size={12} fill="currentColor" />
             </button>
           ) : (
             <button
@@ -583,7 +583,7 @@ export function Chat() {
               disabled={!input.trim() || !ready || configured === false}
               aria-label="Send message"
             >
-              <ArrowUp size={21} />
+              <ArrowUp size={18} />
             </button>
           )}
         </div>

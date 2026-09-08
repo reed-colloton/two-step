@@ -367,9 +367,9 @@ summary:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 35px;
-  width: 35px;
-  border-radius: 10px;
+  height: 28px;
+  width: 28px;
+  border-radius: 8px;
   color: #fff;
   background: var(--primary);
   transition: background 0.15s;
